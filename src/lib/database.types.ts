@@ -194,6 +194,7 @@ export interface Database {
       }
       transactions: {
         Row: {
+          ac_type: string | null
           additional: string | null
           created_at: string
           cust_address: string
@@ -202,16 +203,20 @@ export interface Database {
           discount_amount: number
           discount_percentage: number
           id: number
-          item_code: string[]
+          item_code: string[] | null
           last_updated: string
           mode_of_payment: string
+          quantity: number | null
           ref: string
+          service: string | null
+          service_price: string | null
           staff_id: number
           total_price: number
           trans_date: string
           trans_type: string | null
         }
         Insert: {
+          ac_type?: string | null
           additional?: string | null
           created_at: string
           cust_address: string
@@ -220,16 +225,20 @@ export interface Database {
           discount_amount: number
           discount_percentage: number
           id?: number
-          item_code: string[]
+          item_code?: string[] | null
           last_updated: string
           mode_of_payment: string
+          quantity?: number | null
           ref: string
+          service?: string | null
+          service_price?: string | null
           staff_id: number
           total_price: number
           trans_date?: string
           trans_type?: string | null
         }
         Update: {
+          ac_type?: string | null
           additional?: string | null
           created_at?: string
           cust_address?: string
@@ -238,10 +247,13 @@ export interface Database {
           discount_amount?: number
           discount_percentage?: number
           id?: number
-          item_code?: string[]
+          item_code?: string[] | null
           last_updated?: string
           mode_of_payment?: string
+          quantity?: number | null
           ref?: string
+          service?: string | null
+          service_price?: string | null
           staff_id?: number
           total_price?: number
           trans_date?: string
@@ -270,6 +282,20 @@ export interface Database {
     }
     Views: {
       total_price_by_month: {
+        Row: {
+          month: number | null
+          total_price: number | null
+        }
+        Relationships: []
+      }
+      total_price_by_month_last_year: {
+        Row: {
+          month: number | null
+          total_price: number | null
+        }
+        Relationships: []
+      }
+      total_price_by_month_this_year: {
         Row: {
           month: number | null
           total_price: number | null

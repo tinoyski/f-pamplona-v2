@@ -7,6 +7,7 @@ import { Transactions } from "@/interfaces/Transactions";
 import { dataFormatter } from "@/utils/Formatters";
 import {
   AreaChart,
+  BadgeDelta,
   BarList,
   Bold,
   Card,
@@ -33,12 +34,18 @@ import { TbCoins, TbCurrencyPeso, TbSwitchHorizontal } from "react-icons/tb";
 
 interface AnalyticsData {
   transactions: {
-    data: Transactions[];
-    totalPriceByMonth: {
+    thisYear: Transactions[];
+    lastYear: Transactions[];
+    totalPriceByMonthLastYear: {
+      month: number;
+      total_price: number;
+    }[];
+    totalPriceByMonthThisYear: {
       month: number;
       total_price: number;
     }[];
     earnings: number;
+    lastYearEarnings: number;
     todaySales: number;
     paymentMethods: {
       cash: number;
@@ -59,113 +66,128 @@ type PaymentChartData = {
   value: number;
 };
 
+type AreaChartData = {
+  [x: number]: number;
+  name: string;
+};
+
 export default function Dashboard() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [todaySales, setTodaySales] = useState<number>(0);
   const [totalEarning, setTotalEarnings] = useState<number>(0);
-  const [chartData, setChartData] = useState([
-    {
-      name: "January",
-      Sales2023: 0,
-      Sales2022: 0,
-    },
-    {
-      name: "February",
-      Sales2023: 0,
-      Sales2022: 0,
-    },
-    {
-      name: "March",
-      Sales2023: 0,
-      Sales2022: 0,
-    },
-    {
-      name: "April",
-      Sales2023: 0,
-      Sales2022: 0,
-    },
-    {
-      name: "May",
-      Sales2023: 0,
-      Sales2022: 0,
-    },
-    {
-      name: "June",
-      Sales2023: 0,
-      Sales2022: 0,
-    },
-    {
-      name: "July",
-      Sales2023: 0,
-      Sales2022: 0,
-    },
-    {
-      name: "August",
-      Sales2023: 0,
-      Sales2022: 0,
-    },
-    {
-      name: "September",
-      Sales2023: 0,
-      Sales2022: 0,
-    },
-    {
-      name: "October",
-      Sales2023: 0,
-      Sales2022: 0,
-    },
-    {
-      name: "November",
-      Sales2023: 0,
-      Sales2022: 0,
-    },
-    {
-      name: "December",
-      Sales2023: 0,
-      Sales2022: 0,
-    },
-  ]);
+  const [chartData, setChartData] = useState<AreaChartData[]>([]);
   const [itemsChartData, setItemsChartData] = useState<ItemChatData[]>([]);
   const [paymentChartData, setPaymentChartData] = useState<PaymentChartData[]>(
     []
   );
+  const [transactionsPercentage, setTransactionsPercentage] =
+    useState<number>(0);
+  const [earningsPercentage, setEarningsPercentage] = useState<number>(0);
 
   useEffect(() => {
     const fetchData = async () => {
       const res = await fetch("/api/dashboard");
       const body = (await res.json()) as AnalyticsData;
+
+      // Destructure the object to be used by the chart data methods
+      const {
+        transactions,
+        transactions: {
+          totalPriceByMonthThisYear,
+          totalPriceByMonthLastYear,
+          paymentMethods,
+        },
+        items,
+      } = body;
+
       setData(body);
-      setTodaySales(body.transactions.todaySales);
-      setTotalEarnings(body.transactions.earnings);
-      body.transactions.totalPriceByMonth.forEach(
-        (value) => (chartData[value.month - 1].Sales2023 = value.total_price)
-      );
-      setChartData(chartData);
+      setTodaySales(transactions.todaySales);
+      setTotalEarnings(transactions.earnings);
 
-      // Item Chart Data
-      const icd = body.items
-        .map(({ name, quantity }) => {
-          return { name, value: quantity };
-        })
+      // Calculate the percentage differentials
+      setTransactionsPercentage(
+        ((transactions.thisYear.length - transactions.lastYear.length) /
+          transactions.lastYear.length) *
+          100
+      );
+      setEarningsPercentage(
+        ((transactions.earnings - transactions.lastYearEarnings) /
+          transactions.lastYearEarnings) *
+          100
+      );
+
+      /**
+       * Dynamically generates an array containing:
+       * {
+       *    name: The month
+       *    [currentYear]: The current year's data
+       *    [lastYear]: Last year's data
+       * }
+       *
+       * We then populate the data one by one.
+       */
+      const currentYear = new Date().getFullYear();
+      const lastYear = currentYear - 1;
+      const updatedChartData = Array.from({ length: 12 }, (_, i) => ({
+        name: new Date(currentYear, i).toLocaleString("default", {
+          month: "long",
+        }),
+        [currentYear]: 0,
+        [lastYear]: 0,
+      }));
+
+      // This populates the current year's data
+      totalPriceByMonthThisYear.forEach(
+        (value) =>
+          (updatedChartData[value.month - 1][currentYear] = value.total_price)
+      );
+
+      // This populates last year's data
+      totalPriceByMonthLastYear.forEach(
+        (value) =>
+          (updatedChartData[value.month - 1][lastYear] = value.total_price)
+      );
+
+      setChartData(updatedChartData);
+
+      // Uncomment this when you want to see the generated data
+      console.log(updatedChartData);
+
+      const itemsChartData = items
+        .map(({ name, quantity }) => ({ name, value: quantity }))
         .sort((a, b) => a.value - b.value);
-      setItemsChartData(icd);
 
-      // Payment Chart Data
-      const pcd = Object.entries(body.transactions.paymentMethods).map(
-        ([key, value]) => {
-          return {
-            name: _.startCase(key),
-            value,
-          };
-        }
+      setItemsChartData(itemsChartData);
+
+      const paymentChartData = Object.entries(paymentMethods).map(
+        ([key, value]) => ({
+          name: _.startCase(key),
+          value,
+        })
       );
-      setPaymentChartData(pcd);
+
+      setPaymentChartData(paymentChartData);
     };
 
     if (!data) {
       fetchData();
     }
   }, [data, chartData]);
+
+  function getDeltaType(value: number) {
+    let deltaType = "unchanged";
+    if (value > 20) {
+      deltaType = "increase";
+    } else if (value > 10) {
+      deltaType = "moderateIncrease";
+    } else if (value < 0) {
+      deltaType = "moderateDecrease";
+    } else if (value < -10) {
+      deltaType = "decrease";
+    }
+
+    return deltaType;
+  }
 
   return (
     <div className="flex flex-col gap-5 ">
@@ -178,7 +200,7 @@ export default function Dashboard() {
             <Card
               decoration="top"
               decorationColor="blue"
-              className="drop-shadow-md"
+              className="drop-shadow-md h-full"
             >
               <div className="flex gap-5">
                 <Icon
@@ -190,7 +212,7 @@ export default function Dashboard() {
                 />
                 <div>
                   <Text>Items in stock</Text>
-                  <Metric>{data?.items.length || 0}</Metric>
+                  <Metric className="mt-3">{data?.items.length || 0}</Metric>
                 </div>
               </div>
             </Card>
@@ -209,7 +231,7 @@ export default function Dashboard() {
                 />
                 <div>
                   <Text>Today&apos;s total sales</Text>
-                  <Metric>{todaySales}</Metric>
+                  <Metric className="mt-3">{todaySales}</Metric>
                 </div>
               </div>
             </Card>
@@ -218,7 +240,7 @@ export default function Dashboard() {
               decorationColor="amber"
               className="drop-shadow-md"
             >
-              <div className="flex gap-5">
+              <div className="flex gap-3">
                 <Icon
                   icon={TbSwitchHorizontal}
                   color="amber"
@@ -227,8 +249,20 @@ export default function Dashboard() {
                   tooltip="This year's Transactions"
                 />
                 <div>
-                  <Text>This year&apos;s Transactions</Text>
-                  <Metric>{data?.transactions.data.length || 0}</Metric>
+                  <Flex>
+                    <Text>This year&apos;s Transactions</Text>
+                    <BadgeDelta
+                      className="ml-7"
+                      deltaType={getDeltaType(transactionsPercentage)}
+                      isIncreasePositive={true}
+                      size="xs"
+                    >
+                      {`${
+                        transactionsPercentage > 0 ? "+" : ""
+                      }${transactionsPercentage.toFixed(2)}%`}
+                    </BadgeDelta>
+                  </Flex>
+                  <Metric className="mt-1">{data?.transactions.thisYear.length || 0}</Metric>
                 </div>
               </div>
             </Card>
@@ -246,8 +280,20 @@ export default function Dashboard() {
                   tooltip="This year's Sales"
                 />
                 <div>
-                  <Text>This year&apos;s Sales</Text>
-                  <Metric>{dataFormatter(totalEarning).slice(1)}</Metric>
+                  <Flex>
+                    <Text>This year&apos;s Sales</Text>
+                    <BadgeDelta
+                      className="ml-7"
+                      deltaType={getDeltaType(earningsPercentage)}
+                      isIncreasePositive={true}
+                      size="xs"
+                    >
+                      {`${
+                        earningsPercentage > 0 ? "+" : ""
+                      }${earningsPercentage.toFixed(2)}%`}
+                    </BadgeDelta>
+                  </Flex>
+                  <Metric className="mt-1">{dataFormatter(totalEarning).slice(1)}</Metric>
                 </div>
               </div>
             </Card>
@@ -261,8 +307,11 @@ export default function Dashboard() {
                 className="mt-6 h-96"
                 data={chartData}
                 index="name"
-                categories={["Sales2022", "Sales2023"]}
-                colors={["cyan", "blue"]}
+                categories={[
+                  `${new Date().getFullYear()}`,
+                  `${new Date().getFullYear() - 1}`,
+                ]}
+                colors={["blue", "red"]}
                 intervalType="preserveStartEnd"
                 valueFormatter={dataFormatter}
                 yAxisWidth={93}

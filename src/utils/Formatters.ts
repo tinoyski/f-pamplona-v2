@@ -42,7 +42,7 @@ interface pdfProps {
     email?: string;
     otherInfo?: string;
   };
-  invoice?: {
+  receipt?: {
     label?: string;
     num?: number;
     invDate?: string;
@@ -87,7 +87,7 @@ export function dataFormatter(number: number): string {
   }).format(number);
 }
 
-export function jsPDFInvoiceTemplate(props: pdfProps) {
+export function jsPDFReceiptTemplate(props: pdfProps) {
   const param = {
     returnJsPDFDocObject: props.returnJsPDFDocObject || false,
     fileName: props.fileName || "",
@@ -130,18 +130,18 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
       email: props.contact?.email || "",
       otherInfo: props.contact?.otherInfo || "",
     },
-    invoice: {
-      label: props.invoice?.label || "",
-      num: props.invoice?.num || "",
-      invDate: props.invoice?.invDate || "",
-      invGenDate: props.invoice?.invGenDate || "",
-      headerBorder: props.invoice?.headerBorder || false,
-      tableBodyBorder: props.invoice?.tableBodyBorder || false,
-      header: props.invoice?.header || [],
-      table: props.invoice?.table || [],
-      invDescLabel: props.invoice?.invDescLabel || "",
-      invDesc: props.invoice?.invDesc || "",
-      additionalRows: props.invoice?.additionalRows?.map((x) => {
+    receipt: {
+      label: props.receipt?.label || "",
+      num: props.receipt?.num || "",
+      invDate: props.receipt?.invDate || "",
+      invGenDate: props.receipt?.invGenDate || "",
+      headerBorder: props.receipt?.headerBorder || false,
+      tableBodyBorder: props.receipt?.tableBodyBorder || false,
+      header: props.receipt?.header || [],
+      table: props.receipt?.table || [],
+      invDescLabel: props.receipt?.invDescLabel || "",
+      invDesc: props.receipt?.invDesc || "",
+      additionalRows: props.receipt?.additionalRows?.map((x) => {
         return {
           col1: x?.col1 || "",
           col2: x?.col2 || "",
@@ -166,8 +166,8 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
       height: doc.getTextDimensions(lines).h,
     };
   };
-  if (param.invoice.table && param.invoice.table.length) {
-    if (param.invoice.table[0].length != param.invoice.header.length)
+  if (param.receipt.table && param.receipt.table.length) {
+    if (param.receipt.table[0].length != param.receipt.header.length)
       throw Error("Length of header and table column must be equal.");
   }
 
@@ -258,7 +258,7 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
   });
 
   //line breaker after logo & business info
-  if (param.invoice.header.length) {
+  if (param.receipt.header.length) {
     currentHeight += pdfConfig.subLineHeight;
     doc.line(10, currentHeight, docWidth - 10, currentHeight);
   }
@@ -276,32 +276,32 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
   doc.setFontSize(pdfConfig.headerTextSize - 5);
   if (param.contact.name) doc.text(param.contact.name, 10, currentHeight);
 
-  if (param.invoice.label && param.invoice.num) {
+  if (param.receipt.label && param.receipt.num) {
     doc.text(
-      param.invoice.label + param.invoice.num,
+      param.receipt.label + param.receipt.num,
       docWidth - 10,
       currentHeight,
       { align: "right" }
     );
   }
 
-  if (param.contact.name || (param.invoice.label && param.invoice.num))
+  if (param.contact.name || (param.receipt.label && param.receipt.num))
     currentHeight += pdfConfig.subLineHeight;
 
   doc.setTextColor(colorGray);
   doc.setFontSize(pdfConfig.fieldTextSize - 2);
 
-  if (param.contact.address || param.invoice.invDate) {
+  if (param.contact.address || param.receipt.invDate) {
     doc.text(param.contact.address, 10, currentHeight);
-    doc.text(param.invoice.invDate, docWidth - 10, currentHeight, {
+    doc.text(param.receipt.invDate, docWidth - 10, currentHeight, {
       align: "right",
     });
     currentHeight += pdfConfig.subLineHeight;
   }
 
-  if (param.contact.phone || param.invoice.invGenDate) {
+  if (param.contact.phone || param.receipt.invGenDate) {
     doc.text(param.contact.phone, 10, currentHeight);
-    doc.text(param.invoice.invGenDate, docWidth - 10, currentHeight, {
+    doc.text(param.receipt.invGenDate, docWidth - 10, currentHeight, {
       align: "right",
     });
     currentHeight += pdfConfig.subLineHeight;
@@ -321,18 +321,18 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
   //let tdWidth = 31.66;
   //10 margin left - 10 margin right
   let tdWidth =
-    (doc.internal.pageSize.getWidth() - 20) / param.invoice.header.length;
+    (doc.internal.pageSize.getWidth() - 20) / param.receipt.header.length;
 
   //#region TD WIDTH
-  if (param.invoice.header.length > 2) {
+  if (param.receipt.header.length > 2) {
     //add style for 2 or more columns
-    const customColumnNo = param.invoice.header
+    const customColumnNo = param.receipt.header
       .map((x) => x?.style?.width || 0)
       .filter((x) => x > 0);
     let customWidthOfAllColumns = customColumnNo.reduce((a, b) => a + b, 0);
     tdWidth =
       (doc.internal.pageSize.getWidth() - 20 - customWidthOfAllColumns) /
-      (param.invoice.header.length - customColumnNo.length);
+      (param.receipt.header.length - customColumnNo.length);
   }
   //#endregion
 
@@ -341,12 +341,12 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
     currentHeight += 2;
     const lineHeight = 7;
     let startWidth = 0;
-    for (let i = 0; i < param.invoice.header.length; i++) {
-      const currentTdWidth = param.invoice.header[i]?.style?.width || tdWidth;
+    for (let i = 0; i < param.receipt.header.length; i++) {
+      const currentTdWidth = param.receipt.header[i]?.style?.width || tdWidth;
       if (i === 0) doc.rect(10, currentHeight, currentTdWidth, lineHeight);
       else {
         const previousTdWidth =
-          param.invoice.header[i - 1]?.style?.width || tdWidth;
+          param.receipt.header[i - 1]?.style?.width || tdWidth;
         const widthToUse =
           currentTdWidth == previousTdWidth ? currentTdWidth : previousTdWidth;
         startWidth += widthToUse;
@@ -360,12 +360,12 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
   //#region TABLE BODY BORDER
   let addTableBodyBorder = (lineHeight: number) => {
     let startWidth = 0;
-    for (let i = 0; i < param.invoice.header.length; i++) {
-      const currentTdWidth = param.invoice.header[i]?.style?.width || tdWidth;
+    for (let i = 0; i < param.receipt.header.length; i++) {
+      const currentTdWidth = param.receipt.header[i]?.style?.width || tdWidth;
       if (i === 0) doc.rect(10, currentHeight, currentTdWidth, lineHeight);
       else {
         const previousTdWidth =
-          param.invoice.header[i - 1]?.style?.width || tdWidth;
+          param.receipt.header[i - 1]?.style?.width || tdWidth;
         const widthToUse =
           currentTdWidth == previousTdWidth ? currentTdWidth : previousTdWidth;
         startWidth += widthToUse;
@@ -377,7 +377,7 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
 
   //#region TABLE HEADER
   let addTableHeader = () => {
-    if (param.invoice.headerBorder) addTableHeaderBorder();
+    if (param.receipt.headerBorder) addTableHeaderBorder();
 
     currentHeight += pdfConfig.subLineHeight;
     doc.setTextColor(colorBlack);
@@ -387,12 +387,12 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
     currentHeight += 2;
 
     let startWidth = 0;
-    param.invoice.header.forEach(function (row, index) {
+    param.receipt.header.forEach(function (row, index) {
       if (index == 0) doc.text(row.title, 11, currentHeight);
       else {
         const currentTdWidth = row?.style?.width || tdWidth;
         const previousTdWidth =
-          param.invoice.header[index - 1]?.style?.width || tdWidth;
+          param.receipt.header[index - 1]?.style?.width || tdWidth;
         const widthToUse =
           currentTdWidth == previousTdWidth ? currentTdWidth : previousTdWidth;
         startWidth += widthToUse;
@@ -408,18 +408,18 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
   addTableHeader();
 
   //#region TABLE BODY
-  let tableBodyLength = param.invoice.table.length;
-  param.invoice.table.forEach((row: any[], index: number) => {
+  let tableBodyLength = param.receipt.table.length;
+  param.receipt.table.forEach((row: any[], index: number) => {
     doc.line(10, currentHeight, docWidth - 10, currentHeight);
 
     //get nax height for the current row
     let getRowsHeight = function () {
       let rowsHeight: any[] = [];
       row.forEach(function (rr, index) {
-        const widthToUse = param.invoice.header[index]?.style?.width || tdWidth;
+        const widthToUse = param.receipt.header[index]?.style?.width || tdWidth;
 
         let item = splitTextAndGetHeight(rr.toString(), widthToUse - 1); //minus 1, to fix the padding issue between borders
-        rowsHeight.push(item.height);
+        rowsHeight.push(item.height + 1);
       });
 
       return rowsHeight;
@@ -428,18 +428,18 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
     let maxHeight = Math.max(...getRowsHeight());
 
     //body borders
-    if (param.invoice.tableBodyBorder) addTableBodyBorder(maxHeight + 1);
+    if (param.receipt.tableBodyBorder) addTableBodyBorder(maxHeight + 1);
 
     let startWidth = 0;
     row.forEach(function (rr, index) {
-      const widthToUse = param.invoice.header[index]?.style?.width || tdWidth;
+      const widthToUse = param.receipt.header[index]?.style?.width || tdWidth;
       let item = splitTextAndGetHeight(rr.toString(), widthToUse - 1); //minus 1, to fix the padding issue between borders
 
       if (index == 0) doc.text(item.text, 11, currentHeight + 4);
       else {
         const currentTdWidth = rr?.style?.width || tdWidth;
         const previousTdWidth =
-          param.invoice.header[index - 1]?.style?.width || tdWidth;
+          param.receipt.header[index - 1]?.style?.width || tdWidth;
         const widthToUse =
           currentTdWidth == previousTdWidth ? currentTdWidth : previousTdWidth;
         startWidth += widthToUse;
@@ -486,7 +486,7 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
   //#endregion
 
   let invDescSize = splitTextAndGetHeight(
-    param.invoice.invDesc,
+    param.receipt.invDesc,
     docWidth / 2
   ).height;
 
@@ -562,32 +562,32 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
 
   //#region additionalRows
   if (
-    param.invoice.additionalRows &&
-    param.invoice.additionalRows?.length > 0
+    param.receipt.additionalRows &&
+    param.receipt.additionalRows?.length > 0
   ) {
     //#region Line breaker before invoce total
     doc.line(docWidth / 2, currentHeight, docWidth - 10, currentHeight);
     currentHeight += pdfConfig.lineHeight;
     //#endregion
 
-    for (let i = 0; i < param.invoice.additionalRows.length; i++) {
+    for (let i = 0; i < param.receipt.additionalRows.length; i++) {
       currentHeight += pdfConfig.lineHeight;
-      doc.setFontSize(param.invoice.additionalRows[i].style.fontSize);
+      doc.setFontSize(param.receipt.additionalRows[i].style.fontSize);
 
       doc.text(
-        param.invoice.additionalRows[i].col1,
+        param.receipt.additionalRows[i].col1,
         docWidth / 1.5,
         currentHeight,
         { align: "right" }
       );
       doc.text(
-        param.invoice.additionalRows[i].col2,
+        param.receipt.additionalRows[i].col2,
         docWidth - 25,
         currentHeight,
         { align: "right" }
       );
       doc.text(
-        param.invoice.additionalRows[i].col3,
+        param.receipt.additionalRows[i].col3,
         docWidth - 10,
         currentHeight,
         { align: "right" }
@@ -631,16 +631,16 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
   //#endregion
 
   //#region INVOICE DESCRIPTION
-  let addInvoiceDesc = () => {
+  let addReceiptDesc = () => {
     doc.setFontSize(pdfConfig.labelTextSize);
     doc.setTextColor(colorBlack);
 
-    doc.text(param.invoice.invDescLabel, 10, currentHeight);
+    doc.text(param.receipt.invDescLabel, 10, currentHeight);
     currentHeight += pdfConfig.subLineHeight;
     doc.setTextColor(colorGray);
     doc.setFontSize(pdfConfig.fieldTextSize - 1);
 
-    let lines = doc.splitTextToSize(param.invoice.invDesc, docWidth / 2);
+    let lines = doc.splitTextToSize(param.receipt.invDesc, docWidth / 2);
     //text in left half
     doc.text(lines, 10, currentHeight);
     currentHeight +=
@@ -650,7 +650,7 @@ export function jsPDFInvoiceTemplate(props: pdfProps) {
 
     return currentHeight;
   };
-  addInvoiceDesc();
+  addReceiptDesc();
   //#endregion
 
   addStamp();

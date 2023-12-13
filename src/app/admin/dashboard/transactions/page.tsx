@@ -1,6 +1,6 @@
 "use client";
 
-import Invoice from "@/components/Invoice";
+import Receipt from "@/components/Receipt";
 import Loading from "@/components/Loading";
 import TransactionsForm, {
   TransactionFormValues,
@@ -29,6 +29,7 @@ import {
 import {
   Button,
   Datepicker,
+  Dropdown,
   Label,
   Modal,
   Pagination,
@@ -39,9 +40,11 @@ import { FormikHelpers } from "formik";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useEffect, useState } from "react";
-import { GrDocumentPdf } from "react-icons/gr";
+import { GrDocumentPdf, GrTransaction } from "react-icons/gr";
 import { HiOutlinePlus, HiOutlineSearch } from "react-icons/hi";
 import { toast } from "react-toastify";
+import { MdCleaningServices } from "react-icons/md";
+import ServiceForm, { ServiceFormValues } from "@/components/ServiceForm";
 
 // export const metadata: Metadata = {
 //   title: "Transactions",
@@ -74,6 +77,7 @@ export default function TransactionsPage() {
       const data = await res.json();
 
       setTransactionList(data);
+      console.log(data);
       setFilteredItems(data);
     };
 
@@ -147,8 +151,37 @@ export default function TransactionsPage() {
     setOpenModal(undefined);
   }
 
+  async function handleServiceSubmit(
+    values: ServiceFormValues,
+    { setSubmitting }: FormikHelpers<ServiceFormValues>
+  ) {
+    setSubmitting(true);
+
+    const { status } = await fetch("/api/transactions", {
+      method: "POST",
+      body: JSON.stringify({ ...values, staffId: user?.id }, null, 2),
+    });
+
+    if (status === 200) {
+      toast.success("Service Transaction added!");
+      setTransactionList([]);
+    } else {
+      toast.error(
+        "Something went wrong! Please contact administrator for support!"
+      );
+    }
+    setOpenModal(undefined);
+  }
+
   // Add Transaction Form props
-  const props = { openModal, setOpenModal, handleTransSubmit, items };
+  const transactionFormProps = {
+    openModal,
+    setOpenModal,
+    handleTransSubmit,
+    items,
+  };
+
+  const serviceFormProps = { openModal, setOpenModal, handleServiceSubmit };
 
   const invoiceProps = { openModal, setOpenModal, transaction };
 
@@ -310,15 +343,32 @@ export default function TransactionsPage() {
                 <GrDocumentPdf className="h-5 w-5" />
                 <p className="ml-2">Generate Report</p>
               </Button>
-              <Button
+              <Dropdown
                 color="success"
-                onClick={() => {
-                  props.setOpenModal("transaction-form");
-                }}
+                label={
+                  <>
+                    <HiOutlinePlus className="h-5 w-5" />
+                    <p className="ml-2">Add</p>
+                  </>
+                }
               >
-                <HiOutlinePlus className="h-5 w-5" />
-                <p className="ml-2">Add</p>
-              </Button>
+                <Dropdown.Item
+                  icon={GrTransaction}
+                  onClick={() => {
+                    transactionFormProps.setOpenModal("transaction-form");
+                  }}
+                >
+                  Transaction
+                </Dropdown.Item>
+                <Dropdown.Item
+                  icon={MdCleaningServices}
+                  onClick={() => {
+                    serviceFormProps.setOpenModal("service-form");
+                  }}
+                >
+                  Service
+                </Dropdown.Item>
+              </Dropdown>
             </div>
           )}
         </div>
@@ -332,8 +382,12 @@ export default function TransactionsPage() {
                   <TableRow className="border-b ">
                     <TableHeaderCell>ID</TableHeaderCell>
                     <TableHeaderCell>Transaction No.</TableHeaderCell>
-                    <TableHeaderCell>Total Items</TableHeaderCell>
-                    <TableHeaderCell>Total Amount</TableHeaderCell>
+                    <TableHeaderCell className="text-center">
+                      Total Items
+                    </TableHeaderCell>
+                    <TableHeaderCell className="text-center">
+                      Total Amount
+                    </TableHeaderCell>
                     <TableHeaderCell className="text-center">
                       Mode of Payment
                     </TableHeaderCell>
@@ -341,6 +395,9 @@ export default function TransactionsPage() {
                     <TableHeaderCell>Date</TableHeaderCell>
                     <TableHeaderCell className="text-center">
                       Transaction Type
+                    </TableHeaderCell>
+                    <TableHeaderCell className="text-center">
+                      Remarks
                     </TableHeaderCell>
                   </TableRow>
                 </TableHead>
@@ -362,18 +419,22 @@ export default function TransactionsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Text>
+                        <Text className="text-center">
                           {transaction.item_code
-                            .map((item) => JSON.parse(item).quantity)
-                            .reduce(
-                              (accumulator, currentValue) =>
-                                accumulator + currentValue,
-                              0
-                            )}
+                            ? transaction.item_code
+                                .map((item) => JSON.parse(item).quantity)
+                                .reduce(
+                                  (accumulator, currentValue) =>
+                                    accumulator + currentValue,
+                                  0
+                                )
+                            : transaction.quantity}
                         </Text>
                       </TableCell>
                       <TableCell>
-                        <Text>{dataFormatter(transaction.total_price)}</Text>
+                        <Text className="text-center">
+                          {dataFormatter(transaction.total_price)}
+                        </Text>
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge
@@ -423,6 +484,11 @@ export default function TransactionsPage() {
                         </Text>
                       </TableCell>
                       <TableCell className="text-center">
+                        <Text>
+                          {transaction.service ? "Service" : "Transaction"}
+                        </Text>
+                      </TableCell>
+                      <TableCell className="text-center">
                         <Text>{transaction.trans_type}</Text>
                       </TableCell>
                     </TableRow>
@@ -447,10 +513,13 @@ export default function TransactionsPage() {
         </div>
       </Card>
 
-      <Invoice {...invoiceProps} />
+      <Receipt {...invoiceProps} />
 
       {/* Transaction Form */}
-      <TransactionsForm {...props} />
+      <TransactionsForm {...transactionFormProps} />
+
+      {/* Service Form */}
+      <ServiceForm {...serviceFormProps} />
 
       {/* Date Range Picker Modal */}
       <Modal

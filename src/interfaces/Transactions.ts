@@ -18,6 +18,10 @@ export interface Transactions {
   created_at?: Date;
   cancelled: boolean;
   last_updated?: Date;
+  ac_type: string | null;
+  quantity: number | null;
+  service: string | null;
+  service_price: string | null;
 }
 
 export interface TransactionItem {

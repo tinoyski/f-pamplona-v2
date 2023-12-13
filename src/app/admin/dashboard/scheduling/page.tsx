@@ -3,7 +3,11 @@
 import ConfirmModal from "@/components/ConfirmModal";
 import Loading from "@/components/Loading";
 import { Item } from "@/interfaces/Items";
-import { Schedule, ScheduleResult, ScheduleStatus } from "@/interfaces/Schedule";
+import {
+  Schedule,
+  ScheduleResult,
+  ScheduleStatus,
+} from "@/interfaces/Schedule";
 import {
   Accordion,
   AccordionBody,
@@ -31,7 +35,7 @@ import {
   TextInput,
 } from "flowbite-react";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
-import { HiOutlineSearch } from "react-icons/hi";
+import { HiChevronDown, HiOutlineSearch } from "react-icons/hi";
 import { FaCircleCheck, FaCircleXmark } from "react-icons/fa6";
 import { LuListTodo } from "react-icons/lu";
 import { toast } from "react-toastify";
@@ -354,7 +358,7 @@ function TableComponent({
 
             switch (schedule.status) {
               case ScheduleStatus.TODO:
-                color = "bg-yellow-500";
+                color = "bg-yellow-400";
                 break;
               case ScheduleStatus.DONE:
                 color = "bg-green-500";
@@ -421,9 +425,12 @@ function TableComponent({
                       label=""
                       dismissOnClick={false}
                       renderTrigger={() => (
-                        <span className="select-none hover:cursor-pointer">
-                          {schedule.status}
-                        </span>
+                        <div className="select-none hover:cursor-pointer">
+                          <div className="flex items-center justify-center">
+                            <p>{schedule.status}</p>
+                            <HiChevronDown className="w-5 h-5" />
+                          </div>
+                        </div>
                       )}
                     >
                       {Object.keys(ScheduleStatus)

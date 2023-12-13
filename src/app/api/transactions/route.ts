@@ -27,7 +27,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("transactions")
     .select()
-    .order("created_at", { ascending: false });
+    .order("id", { ascending: false });
 
   if (error) {
     console.error(error);
@@ -72,37 +72,39 @@ export async function POST(request: NextRequest) {
 
   const json = await request.json();
 
-  json.itemCodes.forEach(
-    async ({ item, quantity }: { item: string; quantity: number }) => {
-      const { data } = await supabase
-        .from("items")
-        .select("quantity, sold_items")
-        .eq("code", item)
-        .single();
-
-      if (data !== null) {
-        const { error } = await supabase
+  if (json.itemCodes) {
+    json.itemCodes.forEach(
+      async ({ item, quantity }: { item: string; quantity: number }) => {
+        const { data } = await supabase
           .from("items")
-          .update({
-            quantity: data.quantity - quantity,
-            sold_items: (data.sold_items || 0) + quantity,
-          })
-          .eq("code", item);
+          .select("quantity, sold_items")
+          .eq("code", item)
+          .single();
 
-        if (error) {
-          console.error(error);
-          return NextResponse.json([], { status: 500 });
+        if (data !== null) {
+          const { error } = await supabase
+            .from("items")
+            .update({
+              quantity: data.quantity - quantity,
+              sold_items: (data.sold_items || 0) + quantity,
+            })
+            .eq("code", item);
+
+          if (error) {
+            console.error(error);
+            return NextResponse.json([], { status: 500 });
+          }
         }
       }
-    }
-  );
+    );
+  }
 
   const transaction = {
     ref: `TRANS-${(count + 1)?.toLocaleString("en-PH", {
       minimumIntegerDigits: 4,
       useGrouping: false,
     })}`,
-    additional: `${json.additional} ${json.price}`,
+    additional: `${json.additional} ${json.additionalPrice}`,
     created_at: new Date().toISOString(),
     cust_address: json.customerAddress,
     cust_name: json.customerName,
@@ -115,7 +117,11 @@ export async function POST(request: NextRequest) {
     staff_id: 1,
     total_price: json.grandTotal,
     trans_date: new Date().toISOString(),
-    trans_type: json.transactionType,
+    trans_type: json.service ? "ONLINE" : json.transactionType,
+    ac_type: json.acType,
+    quantity: json.quantity,
+    service: json.service,
+    service_price: json.servicePrice,
   };
 
   const { status, statusText, error } = await supabase

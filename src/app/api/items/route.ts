@@ -35,7 +35,6 @@ export async function GET(request: NextRequest) {
       .from("items")
       .select()
       .eq("code", id)
-      .order("date_added", { ascending: false })
       .single();
 
     if (error) {
@@ -49,7 +48,7 @@ export async function GET(request: NextRequest) {
       .from("items")
       .select()
       .eq("archived", archived)
-      .order("date_added", { ascending: false });
+      .order("id", { ascending: true })
 
     if (error) {
       console.error(error);

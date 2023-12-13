@@ -1,19 +1,16 @@
-import { Item } from "@/interfaces/Items";
-import { dataFormatter } from "@/utils/Formatters";
-import { Divider } from "@tremor/react";
 import { Button, Label, Modal, Select, Table, TextInput } from "flowbite-react";
-import { FieldArray, Formik, FormikProps, useFormikContext } from "formik";
-import React, { useEffect, useRef, useState } from "react";
-import { HiOutlinePlus } from "react-icons/hi";
+import { Formik, FormikProps, useFormikContext } from "formik";
+import { useEffect, useRef, useState } from "react";
+import { Divider } from "@tremor/react";
+import { dataFormatter } from "@/utils/Formatters";
 import { number, object, string } from "yup";
+import _ from "lodash";
 
-export interface TransactionFormValues {
-  items: [
-    {
-      code: number;
-      quantity: number;
-    }
-  ];
+export interface ServiceFormValues {
+  acType: string;
+  quantity: number;
+  service: string;
+  servicePrice: number;
   additional: string;
   additionalPrice: number;
   discount: number;
@@ -24,27 +21,21 @@ export interface TransactionFormValues {
   customerName: string;
   customerAddress: string;
   customerContactNo: string;
-  transactionType: string;
 }
 
-export default function TransactionsForm({ ...props }) {
-  const items = props.items as Item[];
-  // const [transactionList, setTransactionList] = useState<Transactions[]>([]);
-  const [additionalPrice, setAdditionalPrice] = useState(0);
+export default function ServiceForm({ ...props }) {
+  const [price, setPrice] = useState(0);
   let [subTotal, setSubTotal] = useState(0);
   const [grandTotal, setGrandTotal] = useState(0);
   const [discountPercent, setDiscountPercent] = useState(0);
   const [discountValue, setDiscountValue] = useState(0);
+  const formRef = useRef<FormikProps<ServiceFormValues>>();
 
-  const formRef = useRef<FormikProps<TransactionFormValues>>();
-
-  const initialValues: TransactionFormValues = {
-    items: [
-      {
-        code: 0,
-        quantity: 1,
-      },
-    ],
+  const initialValues: ServiceFormValues = {
+    acType: "NONE",
+    quantity: 0,
+    service: "NONE",
+    servicePrice: 0,
     additional: "NONE",
     additionalPrice: 0,
     discount: 0,
@@ -55,10 +46,27 @@ export default function TransactionsForm({ ...props }) {
     customerName: "",
     customerAddress: "",
     customerContactNo: "",
-    transactionType: "NONE",
   };
 
   const validationSchema = object().shape({
+    acType: string()
+      .test(
+        "is-none",
+        "Please choose a mode of payment!",
+        (value) => value !== undefined && value !== "NONE"
+      )
+      .required()
+      .label("AC Type"),
+    quantity: number().min(1).required().label("Quantity"),
+    service: string()
+      .test(
+        "is-none",
+        "Please choose a mode of payment!",
+        (value) => value !== undefined && value !== "NONE"
+      )
+      .required()
+      .label("Service"),
+    servicePrice: number().min(0).required().label("Quantity"),
     additional: string().label("Additional"),
     additionalPrice: number()
       .when("additional", {
@@ -94,58 +102,50 @@ export default function TransactionsForm({ ...props }) {
       )
       .required()
       .label("Customer Contact Number"),
-    transactionType: string().required().label("Remarks"),
   });
 
-  // Create observer for formik additional value
   const FormObserver: React.FC = () => {
-    const { values, setFieldValue } = useFormikContext<TransactionFormValues>();
+    const { values, setFieldValue } = useFormikContext<ServiceFormValues>();
 
     useEffect(() => {
       if (values.additional === "NONE") {
         setFieldValue("additionalPrice", 0);
-        setAdditionalPrice(0);
+        setPrice(0);
       } else {
-        setAdditionalPrice(values.additionalPrice);
+        setPrice(values.additionalPrice);
       }
 
-      let filteredItems = [];
-      // TODO: filter items by index
-      // Calculate the sum
-      let sum = 0;
-      values.items.map(({ code: item, quantity }) => {
-        sum += items[item].unit_price * quantity;
-      });
-
-      setSubTotal(sum);
-      setFieldValue("subTotal", sum);
+      setSubTotal(values.servicePrice);
+      setFieldValue("subTotal", values.servicePrice);
       setDiscountPercent(values.discount);
-      setDiscountValue(sum * (values.discount / 100));
-      setFieldValue("discountValue", sum * (values.discount / 100));
-      setGrandTotal(subTotal + additionalPrice - discountValue);
-      setFieldValue("grandTotal", subTotal + additionalPrice - discountValue);
+      setDiscountValue(values.servicePrice * (values.discount / 100));
+      setFieldValue(
+        "discountValue",
+        values.servicePrice * (values.discount / 100)
+      );
+      setGrandTotal(subTotal + price - discountValue);
+      setFieldValue("grandTotal", subTotal + price - discountValue);
     }, [values, setFieldValue]);
 
     return null;
   };
-
   return (
     <Modal
-      show={props.openModal === "transaction-form"}
+      show={props.openModal === "service-form"}
       size="6xl"
       onClose={() => {
         props.setOpenModal(undefined);
         formRef.current?.resetForm();
       }}
     >
-      <Modal.Header>Add Transaction</Modal.Header>
+      <Modal.Header>Add Service</Modal.Header>
       <Modal.Body>
         <Formik
           //@ts-ignore since it works hehe.
           innerRef={formRef}
           initialValues={initialValues}
           validationSchema={validationSchema}
-          onSubmit={props.handleTransSubmit}
+          onSubmit={props.handleServiceSubmit}
         >
           {(formik) => (
             <form
@@ -153,117 +153,139 @@ export default function TransactionsForm({ ...props }) {
               onSubmit={formik.handleSubmit}
             >
               <FormObserver />
-              <div>
-                {/* Items Input */}
-                <FieldArray name="items">
-                  {(arrayHelper) => (
-                    <div className="flex flex-col gap-3">
-                      {formik.values.items.length > 0 &&
-                        formik.values.items.map((item, i) => (
-                          <div key={i} className="flex gap-3 group">
-                            <div className="basis-1/2">
-                              <div className="mb-2">
-                                <Label
-                                  htmlFor={`items.${i}.code`}
-                                  value={`Item ${i + 1}`}
-                                />
-                              </div>
-                              <Select
-                                id={`items.${i}.code`}
-                                {...formik.getFieldProps(`items.${i}.code`)}
-                              >
-                                {items.map((item, i) => (
-                                  <option key={item.id} value={i}>
-                                    {item.name}
-                                  </option>
-                                ))}
-                              </Select>
-                            </div>
-                            {!item ? null : (
-                              <div className="flex gap-3 w-full">
-                                <div className="basis-1/3">
-                                  <div className="mb-2 block">
-                                    <Label
-                                      htmlFor="availableQuantity"
-                                      value="Available Quantity"
-                                    />
-                                  </div>
-                                  <TextInput
-                                    id="availableQuantity"
-                                    readOnly
-                                    value={
-                                      items[formik.values.items[i].code]
-                                        .quantity
-                                    }
-                                  />
-                                </div>
+              <div className="flex gap-3">
+                {/* AC Type Input */}
+                <div className="basis-1/4">
+                  <div className="mb-2 block">
+                    <Label
+                      color={
+                        formik.touched.acType && formik.errors.acType
+                          ? "failure"
+                          : undefined
+                      }
+                      htmlFor="acType"
+                      value="AC Type"
+                    />
+                  </div>
+                  <Select
+                    id="acType"
+                    color={
+                      formik.touched.acType && formik.errors.acType
+                        ? "failure"
+                        : undefined
+                    }
+                    helperText={
+                      formik.touched.acType && formik.errors.acType ? (
+                        <span>{formik.errors.acType}</span>
+                      ) : null
+                    }
+                    {...formik.getFieldProps("acType")}
+                  >
+                    <option value={"NONE"} disabled>
+                      Choose a type...
+                    </option>
+                    <option value={"Split Type"}>Split Type</option>
+                    <option value={"Window Type"}>Window Type</option>
+                  </Select>
+                </div>
 
-                                <div className="basis-1/3">
-                                  <div className="mb-2 block">
-                                    <Label
-                                      htmlFor="unitPrice"
-                                      value="Unit Price"
-                                    />
-                                  </div>
-                                  <TextInput
-                                    id="unitPrice"
-                                    readOnly
-                                    value={
-                                      items[formik.values.items[i].code]
-                                        .unit_price
-                                    }
-                                  />
-                                </div>
-                                <div className="basis-1/3">
-                                  <div className="mb-2 block">
-                                    <Label
-                                      htmlFor={`items.${i}.quantity`}
-                                      value="Quantity"
-                                    />
-                                  </div>
-                                  <TextInput
-                                    id={`items.${i}.quantity`}
-                                    type="number"
-                                    className="w-full"
-                                    max={
-                                      items[formik.values.items[i].code]
-                                        .quantity
-                                    }
-                                    min={1}
-                                    {...formik.getFieldProps(
-                                      `items.${i}.quantity`
-                                    )}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                            {i === 0 ? null : (
-                              <Button
-                                color="failure"
-                                className="hidden group-hover:block mt-auto"
-                                onClick={() => arrayHelper.remove(i)}
-                              >
-                                <p>Delete</p>
-                              </Button>
-                            )}
-                          </div>
-                        ))}
-                      <Button
-                        color="success"
-                        className="w-fit"
-                        onClick={() =>
-                          arrayHelper.push({
-                            code: formik.values.items.length,
-                            quantity: 1,
-                          })
-                        }
-                      >
-                        <HiOutlinePlus className="h-5 w-5" />
-                        <p>Add</p>
-                      </Button>
-                    </div>
-                  )}
-                </FieldArray>
+                {/* Quantity Input */}
+                <div className="basis-1/4">
+                  <div className="mb-2 block">
+                    <Label
+                      color={
+                        formik.touched.quantity && formik.errors.quantity
+                          ? "failure"
+                          : undefined
+                      }
+                      htmlFor="quantity"
+                      value="Quantity"
+                    />
+                  </div>
+                  <TextInput
+                    id="quantity"
+                    type="number"
+                    color={
+                      formik.touched.quantity && formik.errors.quantity
+                        ? "failure"
+                        : undefined
+                    }
+                    helperText={
+                      formik.touched.quantity && formik.errors.quantity ? (
+                        <span>{formik.errors.quantity}</span>
+                      ) : null
+                    }
+                    {...formik.getFieldProps("quantity")}
+                  />
+                </div>
+
+                {/* Service Input */}
+                <div className="basis-1/4">
+                  <div className="mb-2 block">
+                    <Label
+                      color={
+                        formik.touched.service && formik.errors.service
+                          ? "failure"
+                          : undefined
+                      }
+                      htmlFor="service"
+                      value="Service"
+                    />
+                  </div>
+                  <Select
+                    id="service"
+                    color={
+                      formik.touched.service && formik.errors.service
+                        ? "failure"
+                        : undefined
+                    }
+                    helperText={
+                      formik.touched.service && formik.errors.service ? (
+                        <span>{formik.errors.service}</span>
+                      ) : null
+                    }
+                    {...formik.getFieldProps("service")}
+                  >
+                    <option value={"NONE"} disabled>
+                      Choose a service...
+                    </option>
+                    <option value={"cleaning"}>Cleaning</option>
+                    <option value={"repair"}>Repair</option>
+                    <option value={"installation"}>Installation</option>
+                  </Select>
+                </div>
+
+                {/* Service Pice Input */}
+                <div className="basis-1/4">
+                  <div className="mb-2 block">
+                    <Label
+                      color={
+                        formik.touched.servicePrice &&
+                        formik.errors.servicePrice
+                          ? "failure"
+                          : undefined
+                      }
+                      htmlFor="servicePrice"
+                      value="Price"
+                    />
+                  </div>
+                  <TextInput
+                    id="servicePrice"
+                    type="number"
+                    color={
+                      formik.touched.servicePrice && formik.errors.servicePrice
+                        ? "failure"
+                        : undefined
+                    }
+                    helperText={
+                      formik.touched.servicePrice &&
+                      formik.errors.servicePrice ? (
+                        <span>{formik.errors.servicePrice}</span>
+                      ) : null
+                    }
+                    {...formik.getFieldProps("servicePrice")}
+                  />
+                </div>
               </div>
 
               <div className="flex gap-3">
@@ -306,24 +328,26 @@ export default function TransactionsForm({ ...props }) {
                     <div className="mb-2 block">
                       <Label
                         color={
-                          formik.touched.additionalPrice && formik.errors.additionalPrice
+                          formik.touched.additional && formik.errors.additional
                             ? "failure"
                             : undefined
                         }
-                        htmlFor="additionalPrice"
+                        htmlFor="Price"
                         value="Price"
                       />
                     </div>
                     <TextInput
-                      id="additionalPrice"
+                      id="price"
                       type="number"
                       color={
-                        formik.touched.additionalPrice && formik.errors.additionalPrice
+                        formik.touched.additionalPrice &&
+                        formik.errors.additionalPrice
                           ? "failure"
                           : undefined
                       }
                       helperText={
-                        formik.touched.additionalPrice && formik.errors.additionalPrice ? (
+                        formik.touched.additionalPrice &&
+                        formik.errors.additionalPrice ? (
                           <span>{formik.errors.additionalPrice}</span>
                         ) : null
                       }
@@ -400,7 +424,7 @@ export default function TransactionsForm({ ...props }) {
 
               {/* Customer fields */}
               <div className="flex gap-3">
-                <div className="basis-1/4">
+                <div className="basis-1/3">
                   <div className="mb-2">
                     <Label
                       color={
@@ -429,7 +453,7 @@ export default function TransactionsForm({ ...props }) {
                     {...formik.getFieldProps("customerName")}
                   />
                 </div>
-                <div className="basis-1/4">
+                <div className="basis-1/3">
                   <div className="mb-2">
                     <Label
                       color={
@@ -471,7 +495,7 @@ export default function TransactionsForm({ ...props }) {
                     {...formik.getFieldProps("customerContactNo")}
                   />
                 </div>
-                <div className="basis-1/4">
+                <div className="basis-1/3">
                   <div className="mb-2">
                     <Label
                       color={
@@ -501,42 +525,6 @@ export default function TransactionsForm({ ...props }) {
                     {...formik.getFieldProps("customerAddress")}
                   />
                 </div>
-                <div className="basis-1/4">
-                  <div className="mb-2">
-                    <Label
-                      color={
-                        formik.touched.transactionType &&
-                        formik.errors.transactionType
-                          ? "failure"
-                          : undefined
-                      }
-                      htmlFor="transactionType"
-                      value="Remarks"
-                    />
-                  </div>
-                  <Select
-                    id="transactionType"
-                    color={
-                      formik.touched.transactionType &&
-                      formik.errors.transactionType
-                        ? "failure"
-                        : undefined
-                    }
-                    helperText={
-                      formik.touched.transactionType &&
-                      formik.errors.transactionType ? (
-                        <span>{formik.errors.transactionType}</span>
-                      ) : null
-                    }
-                    {...formik.getFieldProps("transactionType")}
-                  >
-                    <option value={"NONE"} disabled>
-                      Choose one...
-                    </option>
-                    <option value="ONLINE">Online</option>
-                    <option value="WALK-IN">Walk-In</option>
-                  </Select>
-                </div>
               </div>
               <Divider className="my-3" />
               <div className="flex">
@@ -564,10 +552,34 @@ export default function TransactionsForm({ ...props }) {
                             : `+63 ${formik.values.customerContactNo}`}
                         </Table.Cell>
                       </Table.Row>
+                      <Table.Row>
+                        <Table.Cell className="py-0 pl-0">AC Type:</Table.Cell>
+                        <Table.Cell className="py-0 pl-0">
+                          {formik.values.acType === "NONE"
+                            ? ""
+                            : formik.values.acType}
+                        </Table.Cell>
+                      </Table.Row>
+                      <Table.Row>
+                        <Table.Cell className="py-0 pl-0">Quantity:</Table.Cell>
+                        <Table.Cell className="py-0 pl-0">
+                          {formik.values.quantity === 0
+                            ? ""
+                            : formik.values.quantity}
+                        </Table.Cell>
+                      </Table.Row>
+                      <Table.Row>
+                        <Table.Cell className="py-0 pl-0">Service:</Table.Cell>
+                        <Table.Cell className="py-0 pl-0">
+                          {formik.values.service === "NONE"
+                            ? ""
+                            : _.startCase(formik.values.service)}
+                        </Table.Cell>
+                      </Table.Row>
                     </Table.Body>
                   </Table>
                 </div>
-                <div className="basis-1/2 text-right">
+                <div className="basis-1/2 text-right mt-auto">
                   <Table>
                     <Table.Body className="text-right text-base">
                       <Table.Row>

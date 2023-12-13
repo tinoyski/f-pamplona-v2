@@ -1,6 +1,6 @@
 import { Item } from "@/interfaces/Items";
 import { Transactions } from "@/interfaces/Transactions";
-import { dataFormatter, jsPDFInvoiceTemplate } from "@/utils/Formatters";
+import { dataFormatter, jsPDFReceiptTemplate } from "@/utils/Formatters";
 import {
   Table,
   TableBody,
@@ -13,8 +13,9 @@ import { Button, Modal } from "flowbite-react";
 import { useEffect, useState } from "react";
 import { HiPrinter } from "react-icons/hi";
 import Loading from "./Loading";
+import _ from "lodash";
 
-interface InvoiceProps {
+interface ReceiptProps {
   transaction: Transactions | null;
   openModal: string | undefined;
   setOpenModal: any;
@@ -25,11 +26,11 @@ interface TransactionItem {
   quantity: number;
 }
 
-export default function Invoice({
+export default function Receipt({
   transaction,
   openModal,
   setOpenModal,
-}: InvoiceProps) {
+}: ReceiptProps) {
   const [items, setItems] = useState<TransactionItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -45,28 +46,33 @@ export default function Invoice({
     };
   };
   useEffect(() => {
-    const promises: Promise<TransactionItem>[] = transaction?.item_code.map(
-      (value) => {
-        const json = JSON.parse(value);
-        return fetchItems(json.item, json.quantity);
-      }
-    )!;
+    if (transaction?.item_code) {
+      const promises: Promise<TransactionItem>[] = transaction?.item_code.map(
+        (value) => {
+          const json = JSON.parse(value);
+          return fetchItems(json.item, json.quantity);
+        }
+      )!;
 
-    if (promises) {
-      Promise.all(promises).then((items) => {
-        setLoading(false);
-        setItems(items);
-      });
+      if (promises) {
+        Promise.all(promises).then((items) => {
+          setLoading(false);
+          setItems(items);
+        });
+      }
+    } else {
+      setLoading(false);
+      console.log(transaction);
     }
-  }, [transaction?.item_code]);
+  }, [transaction?.item_code, transaction]);
 
   function generateTemplate(
     transaction: Transactions | null,
     items: TransactionItem[]
   ) {
-    const invoicePDF = jsPDFInvoiceTemplate({
+    const invoicePDF = jsPDFReceiptTemplate({
       returnJsPDFDocObject: true,
-      fileName: `Invoice ${new Date().getFullYear()}`,
+      fileName: `Receipt ${new Date().getFullYear()}`,
       orientationLandscape: false,
       compress: true,
       logo: {
@@ -91,10 +97,10 @@ export default function Invoice({
         address: transaction?.cust_address,
         phone: `(+63) ${transaction?.cust_phone}`,
       },
-      invoice: {
-        label: "Transaction #: ",
+      receipt: {
+        label: "Receipt #: ",
         num: +transaction?.ref.split("-")[1]!,
-        invGenDate: `Transaction Date: ${new Date(
+        invGenDate: `Payment Date: ${new Date(
           transaction?.trans_date!
         ).toLocaleString("en-US", {
           timeZone: "Asia/Manila",
@@ -111,33 +117,44 @@ export default function Invoice({
             },
           },
           {
-            title: "ITEM",
+            title: transaction?.service ? "AC TYPE" : "ITEM",
             style: {
               width: 80,
             },
           },
           {
-            title: "UNIT PRICE",
+            title: transaction?.service ? "SERVICE" : "UNIT PRICE",
           },
           {
-            title: "AMOUNT",
+            title: transaction?.service ? "PRICE" : "AMOUNT",
           },
         ],
-        table: items.map(({ item, quantity }) => [
-          quantity,
-          item.name,
-          `Php ${dataFormatter(item.unit_price).slice(1)}`,
-          `Php ${dataFormatter(item.unit_price * quantity).slice(1)}`,
-        ]),
+        table: items.length
+          ? items.map(({ item, quantity }) => [
+              quantity,
+              item.name,
+              `Php ${dataFormatter(item.unit_price).slice(1)}`,
+              `Php ${dataFormatter(item.unit_price * quantity).slice(1)}`,
+            ])
+          : [
+              [
+                transaction?.quantity,
+                transaction?.ac_type,
+                _.startCase(transaction?.service!),
+                `Php ${dataFormatter(+transaction?.service_price!).slice(1)}`,
+              ],
+            ],
         additionalRows: [
           {
             col1: "SUB TOTAL:",
-            col3: `Php ${dataFormatter(
-              items.reduce(
-                (prev, curr) => prev + curr.item.unit_price * curr.quantity,
-                0
-              )
-            ).slice(1)}`,
+            col3: items.length
+              ? `Php ${dataFormatter(
+                  items.reduce(
+                    (prev, curr) => prev + curr.item.unit_price * curr.quantity,
+                    0
+                  )
+                ).slice(1)}`
+              : `Php ${dataFormatter(+transaction?.service_price!).slice(1)}`,
             style: {
               fontSize: 10, //optional, default 12
             },
@@ -183,12 +200,12 @@ export default function Invoice({
       show={openModal === "open-invoice"}
       size={"3xl"}
       onClose={() => {
-        setLoading(true);
+        setLoading(items.length ? true : false);
         setOpenModal(undefined);
         setItems([]);
       }}
     >
-      <Modal.Header>Transaction Receipt</Modal.Header>
+      <Modal.Header>Receipt</Modal.Header>
       <Modal.Body>
         {loading ? (
           <Loading />
@@ -207,7 +224,7 @@ export default function Invoice({
             </div>
             <div className="flex mb-5">
               <div className="flex flex-col">
-                <strong>Bill to</strong>
+                <strong>Bill to:</strong>
                 <p className="font-light">{transaction?.cust_name}</p>
                 <p>{transaction?.cust_address}</p>
                 <p>{transaction?.cust_phone}</p>
@@ -217,13 +234,13 @@ export default function Invoice({
                   <tbody className="text-right">
                     <tr>
                       <td className="pr-8">
-                        <strong>Transaction #</strong>
+                        <strong>Receipt #</strong>
                       </td>
                       <td>{transaction?.ref}</td>
                     </tr>
                     <tr>
                       <td className="pr-8">
-                        <strong>Transaction Date</strong>
+                        <strong>Payment Date</strong>
                       </td>
                       <td>
                         {new Date(
@@ -238,33 +255,54 @@ export default function Invoice({
             <Table>
               <TableHead>
                 <TableRow className="bg-zinc-800">
-                  <TableHeaderCell className="text-white">QTY</TableHeaderCell>
-                  <TableHeaderCell className="text-white">ITEM</TableHeaderCell>
-                  <TableHeaderCell className="text-white">
-                    UNIT PRICE
+                  <TableHeaderCell className="text-white text-center">
+                    QTY
                   </TableHeaderCell>
                   <TableHeaderCell className="text-white">
-                    AMOUNT
+                    {transaction?.service ? "AC TYPE" : "ITEM"}
+                  </TableHeaderCell>
+                  <TableHeaderCell className="text-white text-center">
+                    {transaction?.service ? "SERVICE" : "UNIT PRICE"}
+                  </TableHeaderCell>
+                  <TableHeaderCell className="text-white text-center">
+                    {transaction?.service ? "PRICE" : "AMOUNT"}
                   </TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {items.map(({ item, quantity }) => (
-                  <TableRow key={item.code}>
-                    <TableCell className="border-x border-b">
-                      {quantity}
+                {items.length ? (
+                  items.map(({ item, quantity }) => (
+                    <TableRow key={item.code}>
+                      <TableCell className="border-x border-b text-center">
+                        {quantity}
+                      </TableCell>
+                      <TableCell className="border-x border-b">
+                        {item.name}
+                      </TableCell>
+                      <TableCell className="border-x border-b text-center">
+                        {dataFormatter(item.unit_price)}
+                      </TableCell>
+                      <TableCell className="border-x border-b text-center">
+                        {dataFormatter(item.unit_price * quantity)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell className="border-x border-b text-center">
+                      {transaction?.quantity}
                     </TableCell>
                     <TableCell className="border-x border-b">
-                      {item.name}
+                      {transaction?.ac_type}
                     </TableCell>
-                    <TableCell className="border-x border-b">
-                      {dataFormatter(item.unit_price)}
+                    <TableCell className="border-x border-b text-center">
+                      {_.startCase(transaction?.service!)}
                     </TableCell>
-                    <TableCell className="border-x border-b">
-                      {dataFormatter(item.unit_price * quantity)}
+                    <TableCell className="border-x border-b text-center">
+                      {dataFormatter(+transaction?.service_price!)}
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
             <div className="flex pt-8">
@@ -276,12 +314,14 @@ export default function Invoice({
                     </TableCell>
                     <TableCell className="py-0 pr-0 text-right ">
                       {dataFormatter(
-                        items.reduce(
-                          (prev, curr) =>
-                            prev + curr.item.unit_price * curr.quantity,
-                          0
-                        )
-                      )}
+                        items.length
+                          ? items.reduce(
+                              (prev, curr) =>
+                                prev + curr.item.unit_price * curr.quantity,
+                              0
+                            )
+                          : +transaction?.service_price!
+                      ).slice(1)}
                     </TableCell>
                   </TableRow>
                   <TableRow>

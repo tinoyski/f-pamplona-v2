@@ -27,15 +27,27 @@ export async function GET() {
     .from("transactions")
     .select("trans_date, total_price, mode_of_payment")
     .order("trans_date", { ascending: true });
-  const totalPriceByMonth = await supabase
-    .from("total_price_by_month")
+  const totalPriceByMonthLastYear = await supabase
+    .from("total_price_by_month_last_year")
+    .select();
+  const totalPriceByMonthThisYear = await supabase
+    .from("total_price_by_month_this_year")
     .select();
   const earnings = transactions.data
     ?.filter(
       (value) =>
         new Date(value.trans_date).getFullYear() === new Date().getFullYear()
     )
-    .map(({ total_price }) => total_price);
+    .map(({ total_price }) => total_price)
+    .reduce((a, b) => a + b, 0);
+  const lastYearEarnings = transactions.data
+    ?.filter(
+      (value) =>
+        new Date(value.trans_date).getFullYear() ===
+        new Date().getFullYear() - 1
+    )
+    .map(({ total_price }) => total_price)
+    .reduce((a, b) => a + b, 0);
   const items = await supabase
     .from("items")
     .select(
@@ -50,17 +62,23 @@ export async function GET() {
 
   return NextResponse.json({
     transactions: {
-      data: transactions.data?.filter(
+      thisYear: transactions.data?.filter(
         ({ trans_date }) =>
           new Date(trans_date).getFullYear() === new Date().getFullYear()
       ),
-      totalPriceByMonth: totalPriceByMonth.data,
+      lastYear: transactions.data?.filter(
+        ({ trans_date }) =>
+          new Date(trans_date).getFullYear() === new Date().getFullYear() - 1
+      ),
+      totalPriceByMonthLastYear: totalPriceByMonthLastYear.data,
+      totalPriceByMonthThisYear: totalPriceByMonthThisYear.data,
       todaySales: transactions.data?.filter(
         (value) =>
           value.trans_date.split("T")[0] ===
           new Date().toISOString().split("T")[0]
       ).length,
-      earnings: earnings?.reduce((a, b) => a + b, 0),
+      earnings: earnings,
+      lastYearEarnings: lastYearEarnings,
       paymentMethods: {
         cash: transactions.data?.filter(
           ({ mode_of_payment }) => mode_of_payment === "CASH"
